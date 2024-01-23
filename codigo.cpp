@@ -19,7 +19,10 @@ return rand() % 7;
 typedef struct node {
     int tabuleiro[6][7];
     char estado;
-    node* p[7];
+    int coluna_jogada;
+    int score;
+    struct node* p[7];
+    struct node* pai;
 } Node;
 
 int verificaVencedor(Node* arvore, int timeX);
@@ -34,6 +37,8 @@ void cria(Node* &arvore) {
 
     arvore = new Node;
 
+    arvore->pai = nullptr;
+
     for (int i = 0; i < 6; i++) {
         for (int j = 0; j < 7; j++) {
             arvore->tabuleiro[i][j] = 0;
@@ -45,7 +50,8 @@ void cria(Node* &arvore) {
     }
 }
 
-void gera(Node* &arvore){
+void gera(Node* &arvore, int depth, int MaxDepth,int time){
+    
     int state = verificaVencedor(arvore, 2);
     
     switch (state)
@@ -64,32 +70,28 @@ void gera(Node* &arvore){
     default:
         break;
     }
-
-    cout << arvore->estado;
-    if(arvore->estado == 'V' || arvore->estado == 'D'){
+    
+    if((arvore->estado == 'V' || arvore->estado == 'D') || depth > MaxDepth){
        for(int i=0;i<7;i++){
             arvore->p[i] = nullptr;
         }
-        
     }else{
         for(int i=0;i<7;i++){   
-            if(proxLinhaLivre(arvore->p[i], i) != -1){ 
-                cout<<"joooj";
+            if(proxLinhaLivre(arvore, i) != -1){ 
                 arvore->p[i] = new Node;
+                arvore->p[i]->pai = arvore;
                 for(int a=0;a<6;a++)
                     for(int b=0;b<7;b++)
                         arvore->p[i]->tabuleiro[a][b] = arvore->tabuleiro[a][b];
-                insereElemento(arvore->p[i],i,2);  
-                gera(arvore->p[i]); 
+                insereElemento(arvore->p[i],i,time);  
+                arvore->coluna_jogada = i;
+                gera(arvore->p[i], depth + 1, MaxDepth, time == 2 ? 1 : 2);
             }else{
                 arvore->p[i] = nullptr;
-                cout<<"joooj";
             }
         }
     }
 }
-
-
 
 void destroi(Node* &arvore) {
     for(int i=0;i<7;i++){
@@ -193,61 +195,120 @@ int verificaVencedor(Node* arvore, int timeX) {
     return 0; // Nenhum time venceu ainda
 }
 
-int escolherJogadaComputador(Node* arvore){
-    //verifica se é possível vencer na próxima jogada
-    for(int coluna = 0; coluna < 7; coluna++) {
-        if(proxLinhaLivre(arvore, coluna) != -1) {
-            // Faça uma cópia temporária do tabuleiro
-            Node* temp = new Node(*arvore);
-            insereElemento(temp, coluna, 2);
-            if(verificaVencedor(temp, 2) == 2) {
-                delete temp;
-                return coluna;
+
+int calculaScore(Node* arvore, int timeX){
+    int score=0;
+    
+     // Verificar vitória na horizontal
+    for (int linha = 0; linha < 6; linha++) {
+        for (int coluna = 0; coluna < 4; coluna++) {
+            if (arvore->tabuleiro[linha][coluna] == timeX && arvore->tabuleiro[linha][coluna + 1] == timeX && arvore->tabuleiro[linha][coluna + 2]) {
+                if(arvore->tabuleiro[linha][coluna + 3]  == 0) score +=9;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX && arvore->tabuleiro[linha][coluna + 1] == timeX){
+                if(arvore->tabuleiro[linha][coluna + 2]  == 0)score += 3;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX){
+                if(arvore->tabuleiro[linha][coluna + 1]  == 0)score+=1;
             }
-            delete temp;
         }
     }
 
-    // verificar se é necessário bloquear o oponente de vencer
-    for(int coluna = 0; coluna < 7; coluna++) {
-        if(proxLinhaLivre(arvore, coluna) != -1) {
-            // Faça uma cópia temporária do tabuleiro
-            Node* temp = new Node(*arvore);
-            insereElemento(temp, coluna, 1);
-            if(verificaVencedor(temp, 1) == 1) {
-                delete temp;
-                return coluna;
+    // Verificar vitória na vertical
+    for (int coluna = 0; coluna < 7; coluna++) {
+        for (int linha = 0; linha < 3; linha++) {
+            if (arvore->tabuleiro[linha][coluna] == timeX && arvore->tabuleiro[linha+1][coluna] == timeX && arvore->tabuleiro[linha+2][coluna]) {
+                if(arvore->tabuleiro[linha+3][coluna]  == 0) score +=9;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX && arvore->tabuleiro[linha+1][coluna] == timeX){
+                if(arvore->tabuleiro[linha+2][coluna]  == 0)score += 3;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX){
+                if(arvore->tabuleiro[linha+1][coluna]  == 0)score+=1;
             }
-            delete temp;
         }
     }
-    int proxjogada;
-    bool x = true;
-    while(x == true){
-        proxjogada = gerarNumeroAleatorio();
-        if(proxLinhaLivre(arvore, proxjogada) != -1){
-            return proxjogada;
-            x = false;
+
+    //verifica vitoria na diagonal para baixo
+    for (int linha = 0; linha < 3; linha++) {
+        for (int coluna = 0; coluna < 4; coluna++) {
+            if (arvore->tabuleiro[linha][coluna] == timeX &&arvore->tabuleiro[linha + 1][coluna + 1] == timeX &&arvore->tabuleiro[linha + 2][coluna + 2] == timeX) {
+                if(arvore->tabuleiro[linha + 3][coluna + 3] == 0) score+=9;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX &&arvore->tabuleiro[linha + 1][coluna + 1] == timeX){
+                if(arvore->tabuleiro[linha +2][coluna + 2] == 0) score+=3;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX){
+                if(arvore->tabuleiro[linha + 1][coluna + 1] == 0) score+=1;
+            }
         }
     }
+
+    // Verificar vitória na diagonal para cima
+    for (int linha = 3; linha < 6; linha++) {
+        for (int coluna = 0; coluna < 4; coluna++) {
+            if (arvore->tabuleiro[linha][coluna] == timeX &&arvore->tabuleiro[linha - 1][coluna + 1] == timeX &&arvore->tabuleiro[linha - 2][coluna + 2] == timeX) {
+               if(arvore->tabuleiro[linha - 3][coluna + 3] == 0) score+=9;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX &&arvore->tabuleiro[linha - 1][coluna + 1] == timeX){
+                if(arvore->tabuleiro[linha - 2][coluna + 2] == 0) score+=3;
+            }else if(arvore->tabuleiro[linha][coluna] == timeX){
+                if(arvore->tabuleiro[linha - 1][coluna + 1] == 0) score+=1;
+            }
+        }
+    }
+
+    return score;
+}
+
+Node* apontaMaiorScore(Node* arvore, int &x, Node* &temp){
+    if(arvore != NULL){
+        for(int i=0;i<7;i++){
+            if(x < (calculaScore(arvore->p[i], 2) - calculaScore(arvore->p[i],1) ))
+                x = (calculaScore(arvore->p[i], 2) - calculaScore(arvore->p[i],1));
+                temp = arvore->p[i];
+        }
+    }
+    return temp;
+}
+
+int escolhaDaJogada2EletricBoogaloo(Node* temp){
+    Node* aux;
+    aux = temp;
+    while(temp != nullptr){
+        aux = temp;
+        temp = temp->pai;
+    }
+    return aux->coluna_jogada;
 }
 
 int main() {
     Node* Arvore;
     cria(Arvore);
-    gera(Arvore);
+    int x=0;
+    Node* temp=nullptr;;
     
-    /*while((verificaVencedor(Arvore, 1) != 1)&&(verificaVencedor(Arvore, 2) !=2)&&(verificaVencedor(Arvore, 1) != 3)) {
+    while((verificaVencedor(Arvore, 1) != 1)&&(verificaVencedor(Arvore, 2) !=2)&&(verificaVencedor(Arvore, 1) != 3)) {
         int colunaSelecionada;
         cout << "Selecione uma coluna (0 a 6): " << endl;
         cin >> colunaSelecionada;
         insereElemento(Arvore, colunaSelecionada, 1);
         printTabuleiro(Arvore);
-        insereElemento(Arvore, escolherJogadaComputador(Arvore), 2);
+        if(verificaVencedor(Arvore, 1) == 1 || verificaVencedor(Arvore, 1) == 3) break;
+        gera(Arvore, 0, 6, 2);
+        apontaMaiorScore(Arvore, x, temp);
+        insereElemento(Arvore, escolhaDaJogada2EletricBoogaloo(Arvore), 2);
+        x=0;
+        temp = nullptr;
+        for(int i=0;i<7;i++){
+            if(Arvore->p[i] != nullptr){
+                destroi(Arvore->p[i]);
+            }
+        }
         printTabuleiro(Arvore);
     }
-    cout << "Fim de Jogo." << endl;
-    destroi(Arvore);*/
+    cout << "fim de jogo!" << endl;
+    if(verificaVencedor(Arvore,1)==1){
+        cout << "Você ganhou!!" << endl;
+    }else if(verificaVencedor(Arvore,2)==2){
+        cout << "você perdeu :<" << endl;
+    }else if(verificaVencedor(Arvore,1)==3){
+        cout << "empate!!" << endl;
+    }
+    destroi(Arvore);
     return 0;
 }
 
